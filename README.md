@@ -14,19 +14,19 @@
 
 ### `models/base_vlm.py`
 
-Defines the abstract interface all model wrappers must follow.
+Defines the abstract interface all model wrappers must follow
 
 ### `models/internvl.py` and `models/internvl_small.py`
 
-- `InternVL` loads InternVL checkpoints, decodes first N clip frames, applies transforms, and runs chat-style generation.
-- `InternVLSmall` is a thin subclass that switches to a smaller checkpoint (`InternVL2-1B`) for lower memory use.
+- `InternVL` loads InternVL checkpoints, decodes first N clip frames, applies transforms, and runs chat-style generation
+- `InternVLSmall` is a thin subclass that switches to a smaller checkpoint (`InternVL2-1B`) for lower memory use
 
 ### `models/videollava.py` and `models/videollava_small.py`
 
 - LLaVA wrappers decode first N frames and feed them into chat-template-style multimodal prompts.
-- Large wrapper uses LLaVA-NeXT-Video 7B.
-- Small wrapper uses OneVision 0.5B.
-- Both return text output compatible with the shared `BaseVLM` contract.
+- Large wrapper uses LLaVA-NeXT-Video 7B
+- Small wrapper uses OneVision 0.5B
+- Both return text output compatible with the shared `BaseVLM` contract
 
 ### `scripts/clip.py`
 
@@ -39,7 +39,7 @@ Builds clip datasets from raw videos by:
 
 ### `scripts/inference.py`
 
-Runs a chosen model over all clip files in a selected clip set.
+Runs a chosen model over all clip files in a selected clip set
 
 Inputs:
 
@@ -62,13 +62,13 @@ Converts raw XLSX review data into `gt.csv` (not included in repo)
 ## Process
 
 1. Generate clips:
-   - Run `scripts/clip.py` with desired `--fps` and `--clip_len`.
+   - Run `scripts/clip.py` with desired `--fps` and `--clip_len`
 2. Run inference:
-   - Run `scripts/inference.py` for each model + prompt setup.
-3. Prepare labels (if needed):
-   - Run `scripts/xlsx_to_csv.py` to produce/update `gt.csv`.
+   - Run `scripts/inference.py` for each model + prompt setup
+3. Prepare labels (once):
+   - Run `scripts/xlsx_to_csv.py` to produce/update `gt.csv`
 4. Analyze in notebook:
-   - Use `analysis.ipynb` for cross-setup comparison, fold averages, bootstrap CIs, and plots.
+   - Use `analysis.ipynb` for cross-setup comparison, fold averages, bootstrap CIs, and plots
 
 ## Notes
 
