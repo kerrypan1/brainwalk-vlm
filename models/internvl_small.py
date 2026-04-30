@@ -8,13 +8,13 @@ class InternVLSmall(InternVL):
     File Summary
     ------------
     Thin subclass of `InternVL` that switches to a smaller checkpoint to reduce
-    VRAM usage while preserving identical runtime behavior and API.
+    VRAM usage while keeping the same runtime behavior and API
     """
 
     name = "intern_s"
 
     def __init__(self, model_name=None, num_frames=16, max_new_tokens=256):
-        # Override only the default model id; all processing logic is inherited.
+        # Only override the default model id while inheriting the rest
         super().__init__(
             model_name=model_name or "OpenGVLab/InternVL2-1B",
             num_frames=num_frames,

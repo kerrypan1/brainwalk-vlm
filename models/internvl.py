@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from .base_vlm import BaseVLM
 
-# Video decode + tensor/model dependencies.
+# Video decode and model dependencies
 import av
 import torch
 from PIL import Image
@@ -15,23 +15,23 @@ class InternVL(BaseVLM):
     """
     File Summary
     ------------
-    InternVL model wrapper that adapts OpenGVLab InternVL checkpoints to the
-    shared `BaseVLM.run(video_path, prompt)` interface used by `scripts/inference.py`.
+    InternVL wrapper that adapts OpenGVLab checkpoints to the shared
+    `BaseVLM.run(video_path, prompt)` interface used by `scripts/inference.py`
     """
 
     name = "internvl"
 
     def __init__(self, model_name=None, num_frames=16, max_new_tokens=256):
-        # Default to InternVL2-2B unless the caller overrides it.
+        # Use InternVL2-2B by default unless caller overrides it
         self.model_name = model_name or "OpenGVLab/InternVL2-2B"
         self.num_frames = int(num_frames)
         self.max_new_tokens = int(max_new_tokens)
 
-        # Keep runtime device + dtype centralized in the wrapper.
+        # Keep runtime device and dtype in one place
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.dtype = torch.bfloat16
 
-        # Load model once during init so each clip run is lightweight.
+        # Load model once at init so clip runs stay light
         self.model = (
             AutoModelForCausalLM.from_pretrained(
                 self.model_name,
@@ -44,17 +44,17 @@ class InternVL(BaseVLM):
             .to(self.device)
         )
 
-        # InternVL uses custom tokenizer/model code, so trust_remote_code=True.
+        # InternVL uses custom tokenizer/model code so trust_remote_code stays on
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.model_name,
             use_fast=False,
             trust_remote_code=True,
         )
 
-        # Prompt text is injected by scripts/inference.py before inference starts.
+        # Prompt text is injected by scripts/inference.py before inference starts
         self.prompt_text = ""
 
-        # Reuse one transform pipeline for all decoded frames.
+        # Reuse one transform pipeline for all decoded frames
         self.transform = T.Compose([
             T.Lambda(lambda img: img.convert("RGB") if img.mode != "RGB" else img),
             T.Resize((448, 448), interpolation=InterpolationMode.BICUBIC),
@@ -64,13 +64,13 @@ class InternVL(BaseVLM):
 
     def _decode_first_n_frames(self, video_path: str) -> list[Image.Image]:
         """
-        Decode the first N frames from a pre-cut clip.
-        This avoids expensive full-video seeking/sampling for short clip inputs.
+        Decode the first N frames from a pre-cut clip
+        Since we are using pre-cut 16 frame clips, this will just decode all the frames
         """
         frames: list[Image.Image] = []
         container = av.open(video_path)
         try:
-            # Sequential decode is simple and reliable for short generated clips.
+            # Sequential decode is simple and reliable for short generated clips
             for frame in container.decode(video=0):
                 arr = frame.to_ndarray(format="rgb24")
                 frames.append(Image.fromarray(arr))
@@ -81,28 +81,28 @@ class InternVL(BaseVLM):
         return frames
 
     def run(self, video_path, prompt=None):
-        # Preserve project behavior: prompt_text is preloaded externally.
+        # Keep existing project behavior where prompt_text is preloaded externally
         prompt_text = self.prompt_text
 
         frames = self._decode_first_n_frames(str(video_path))
         if not frames:
-            # Return empty output for unreadable/empty clips.
+            # Return empty output for unreadable or empty clips
             return "", None
 
-        # Stack transformed frames into model-ready tensor batch.
+        # Stack transformed frames into a model-ready tensor batch
         pixel_values = torch.stack([self.transform(img) for img in frames]).to(
             device=self.device,
             dtype=self.dtype,
         )
 
-        # InternVL chat API expects "FrameX: <image>" placeholders in question text.
+        # InternVL chat expects FrameX placeholders in the question text
         video_prefix = "".join([f"Frame{i+1}: <image>\n" for i in range(pixel_values.shape[0])])
         question = video_prefix + prompt_text
 
         generation_config = {"max_new_tokens": self.max_new_tokens, "do_sample": False}
 
         with torch.inference_mode():
-            # `num_patches_list` aligns with one patch group per frame.
+            # num_patches_list aligns with one patch group per frame
             response, _history = self.model.chat(
                 tokenizer=self.tokenizer,
                 pixel_values=pixel_values,
@@ -113,6 +113,6 @@ class InternVL(BaseVLM):
                 return_history=True,
             )
 
-        # Normalize to a plain text string regardless of model return container type.
+        # Normalize output to a plain text string regardless of return container type
         text = response[0] if isinstance(response, (list, tuple)) else response
         return text, None

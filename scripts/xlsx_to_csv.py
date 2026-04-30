@@ -7,7 +7,7 @@
 # - cleans ID format (e.g., BW-XXXX -> numeric),
 # - extracts leading numeric values from mixed text cells,
 # - expands each subject into two rows (suffix _1 and _2),
-# - outputs canonical columns expected by downstream scripts.
+# - outputs canonical columns expected by downstream scripts
 
 import re
 import numpy as np
@@ -23,7 +23,7 @@ NUM_RE = re.compile(r"^\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)")
 
 
 def extract_leading_number(x):
-    """Extract first numeric token from a cell, else NaN."""
+    """Extract first numeric token from a cell, else NaN"""
     if pd.isna(x):
         return np.nan
     m = NUM_RE.match(str(x).strip())
@@ -34,7 +34,7 @@ def extract_leading_number(x):
 
 
 def bw_id_to_int(x):
-    """Extract integer portion of a BW-style identifier."""
+    """Extract integer portion of a BW-style identifier"""
     if pd.isna(x):
         return np.nan
     m = re.search(r"(\d+)", str(x))
@@ -42,11 +42,11 @@ def bw_id_to_int(x):
 
 
 # ---------- read ----------
-# Load source workbook from configured sheet index.
+# Load source workbook from configured sheet index
 df = pd.read_excel(INPUT_XLSX, sheet_name=SHEET, engine="openpyxl")
 
 # ---------- drop unwanted columns ----------
-# Drop common index/date columns not used for model targets.
+# Drop common index or date columns not used for model targets
 first_col = str(df.columns[0]).strip()
 if first_col in {"0", "Unnamed: 0"}:
     df = df.drop(columns=[df.columns[0]])
@@ -55,19 +55,19 @@ if "visit_date_video1" in df.columns:
     df = df.drop(columns=["visit_date_video1"])
 
 # ---------- id cleanup ----------
-# Standardize "BW-ID" to canonical "id" numeric base.
+# Standardize "BW-ID" to canonical "id" numeric base
 df["BW-ID"] = df["BW-ID"].apply(bw_id_to_int)
 df = df.rename(columns={"BW-ID": "id"})
 
 # ---------- numeric cleanup ----------
-# Normalize all metric columns to numeric where possible.
+# Normalize all metric columns to numeric where possible
 for c in df.columns:
     if c != "id":
         df[c] = df[c].apply(extract_leading_number)
 
 # ---------- build long-format rows for *_1 and *_2 ----------
 def find_col(base_name: str, suffix: str) -> str:
-    """Find exact column name case-insensitively for a metric suffix (1/2)."""
+    """Find exact column name case-insensitively for metric suffix 1 or 2"""
     target = f"{base_name}{suffix}"
     for c in df.columns:
         if str(c).strip().lower() == target.lower():
@@ -76,7 +76,7 @@ def find_col(base_name: str, suffix: str) -> str:
 
 
 def find_speed_col(suffix: str) -> str:
-    """Find speed column for a given suffix with tolerant naming match."""
+    """Find speed column for a given suffix with tolerant naming match"""
     for c in df.columns:
         if f"speed{suffix}" in str(c).strip().lower():
             return c
@@ -99,7 +99,7 @@ for _, r in df.iterrows():
 
     base_id_int = int(base_id)
     for suffix in ("1", "2"):
-        # Resolve source columns for this suffix and emit one long-format row.
+        # Resolve source columns for this suffix and emit one long-format row
         speed_col = find_speed_col(suffix)
         metric_cols = {k: find_col(v, suffix) for k, v in metric_templates.items()}
 
@@ -125,6 +125,6 @@ out_df = pd.DataFrame(rows, columns=[
 ])
 
 # ---------- save ----------
-# Persist canonical GT used by evaluate.py and notebook analyses.
+# Persist canonical GT used by evaluate.py and notebook analyses
 out_df.to_csv(OUTPUT_CSV, index=False)
 print("Saved:", OUTPUT_CSV)

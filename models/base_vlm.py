@@ -1,22 +1,22 @@
 """
 File Summary
 ------------
-Defines the shared abstract interface for all model wrappers in this project.
-Any model adapter under `models/` should inherit from `BaseVLM` so the
-inference script can call each model with the same API.
+This is the shared interface for all model wrappers in this project
+Every adapter in `models/` should inherit from `BaseVLM` so inference can call
+all models the same way
 """
 from abc import ABC, abstractmethod
 
 
 class BaseVLM(ABC):
-	"""Common contract for all VLM wrappers used by the pipeline."""
+	"""Common contract all VLM wrappers follow in this pipeline"""
 
 	name = "base"
 
 	@abstractmethod
 	def run(self, video_path, prompt):
 		"""
-		Run the model on one video clip and one prompt string.
+		Run the model on one video clip and one prompt string
 
 		Expected return type across implementations:
 		- `text_output`: generated text prediction

@@ -8,15 +8,15 @@ from pathlib import Path
 # File Summary
 # ------------
 # Runs a selected VLM model over every generated clip under `clips/` and writes
-# one text output per clip under `vlm_output/`.
+# one text output per clip under `vlm_output/`
 #
 # Key responsibilities:
 # - resolve model wrapper from --model,
 # - resolve prompt file from model + ICL mode + dataset suffix,
 # - run model safely on each clip,
-# - skip already-generated outputs for resumability.
+# - skip already-generated outputs so runs can resume
 #
-# Ensure project root is on sys.path before importing project modules
+# Put project root on sys.path before importing project modules
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -41,15 +41,15 @@ ICL_MODES = {
 
 
 def ensure_dir(p: Path) -> None:
-    """Create directory tree if it does not exist."""
+    """Create directory tree if it does not exist"""
     p.mkdir(parents=True, exist_ok=True)
 
 
 def run_model_safe(model, video_path: Path) -> str:
-    """Run one clip through the model and never raise to caller."""
+    """Run one clip through the model and never raise to caller"""
     try:
         result = model.run(str(video_path))
-        # Support wrappers returning either plain string or (text, extra) tuple.
+        # Support wrappers that return plain string or (text, extra) tuple
         if isinstance(result, tuple) and len(result) >= 1:
             return result[0] or ""
         if isinstance(result, str):
@@ -60,7 +60,7 @@ def run_model_safe(model, video_path: Path) -> str:
 
 
 def load_prompt(model_key: str, icl_mode: str, dataset: str) -> str:
-    """Load prompt text file based on model family + ICL mode + dataset tag."""
+    """Load prompt text based on model family, ICL mode, and dataset tag"""
     base = MODEL_PROMPT_BASE[model_key]
     suffix = ICL_MODES[icl_mode]
     prompt_path = PROMPTS_DIR / f"{base}-prompt-{suffix}_{dataset}.txt"
@@ -70,7 +70,7 @@ def load_prompt(model_key: str, icl_mode: str, dataset: str) -> str:
 
 
 def get_model(model_key: str):
-    """Instantiate selected model wrapper with project defaults."""
+    """Instantiate selected model wrapper with project defaults"""
     key = model_key.strip().lower()
     if key == "intern_l":
         from models.internvl import InternVL
@@ -89,7 +89,7 @@ def get_model(model_key: str):
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    # Model + clip set selectors.
+    # Model and clip set selectors
     ap.add_argument("--model", type=str, required=True)
     ap.add_argument("--fps", type=float, required=True)
     ap.add_argument("--clip_len", type=float, required=True)
@@ -103,11 +103,11 @@ def main() -> None:
     dataset = args.dataset
     model_name, model = get_model(args.model)
 
-    # Inject prompt text directly into model wrapper for consistent use.
+    # Inject prompt text directly into model wrapper for consistent use
     prompt_text = load_prompt(args.model.strip().lower(), icl_mode, dataset)
     model.prompt_text = prompt_text
 
-    # Output namespace captures model family + ICL setting + dataset variant.
+    # Output namespace captures model family, ICL setting, and dataset variant
     icl_tag = {"y": "icl", "n": "noicl", "generate": "generate"}[icl_mode]
     output_name = f"{model_name}_{icl_tag}_{dataset}"
 
@@ -123,7 +123,7 @@ def main() -> None:
         print(f"No clips found under {clips_root}")
         return
 
-    # Process clip-by-clip and preserve folder hierarchy.
+    # Process clip by clip while preserving folder hierarchy
     for clip_path in clip_paths:
         rel_parent = clip_path.parent.relative_to(clips_root)
         out_dir = out_root / rel_parent
@@ -131,7 +131,7 @@ def main() -> None:
 
         out_file = out_dir / clip_path.with_suffix(".txt").name
         if out_file.exists():
-            # Skip existing outputs to allow interrupted jobs to resume.
+            # Skip existing outputs so interrupted jobs can resume
             continue
 
         text = run_model_safe(model, clip_path)

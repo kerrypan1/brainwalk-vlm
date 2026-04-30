@@ -6,16 +6,16 @@ from pathlib import Path
 
 # File Summary
 # ------------
-# Creates fixed-length clips from raw gait videos.
+# Builds fixed-length clips from raw gait videos
 # For each input video, it:
 # 1) computes simple frame-difference motion scores,
 # 2) picks up to 3 start times (prefer high-motion, non-overlapping windows),
-# 3) uses ffmpeg to cut clips and enforce output FPS.
+# 3) uses ffmpeg to cut clips and enforce output FPS
 #
 # Outputs are written under:
 #   brainwalk-vlm/clips/clips_fps_<fps>_length_<clip_len>/<video_id>/clip_i.mp4
 #
-# Paths resolved from repository structure, independent of invocation cwd.
+# Paths are resolved from repo structure so cwd does not matter
 SCRIPT_DIR = Path(__file__).resolve().parent
 NEW_DIR = SCRIPT_DIR.parent
 REPO_ROOT = NEW_DIR.parent
@@ -23,10 +23,10 @@ INPUT_DIR = REPO_ROOT / "data" / "bath_pws"  # folder with many .mp4
 OUTPUT_DIR = NEW_DIR / "clips"               # where to create clips_fps_* folders
 
 def motion_scores(video_path, sample_fps):
-    """Return per-sampled-frame times + motion intensity scores for one video."""
+    """Return per-sampled-frame times and motion intensity scores for one video"""
     cap = cv2.VideoCapture(str(video_path))
     src_fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    # Sample approximately `sample_fps` by stepping every N source frames.
+    # Sample near `sample_fps` by stepping every N source frames
     stride = max(1, int(src_fps // sample_fps))
 
     prev = None
@@ -43,7 +43,7 @@ def motion_scores(video_path, sample_fps):
             frame_i += 1
             continue
 
-        # Downsample spatially for faster diff computation.
+        # Downsample spatially to make frame diff computation faster
         gray = cv2.cvtColor(cv2.resize(frame, (320, 240)), cv2.COLOR_BGR2GRAY)
 
         if prev is None:
@@ -60,8 +60,10 @@ def motion_scores(video_path, sample_fps):
 
     cap.release()
 
-    # Mark extreme spikes as likely noise/transitions and zero them out.
+    # Treat extreme spikes as likely noise or transitions and zero them out
     max_m = max(motions) if motions else 0.0
+
+    # It's worth noting that this is a hardcoded value that was determined by trial and error
     HIGH = 0.35 * max_m
 
     scores = []
@@ -75,11 +77,11 @@ def motion_scores(video_path, sample_fps):
 
 def pick_top3_no_overlap_else_allow(times, scores, clip_len, skip_front_ratio=0.15):
     """
-    Pick up to 3 candidate clip starts.
+    Pick up to 3 candidate clip starts
     Preference:
     - avoid first portion of video,
     - maximize summed motion within the clip window,
-    - enforce non-overlap when possible.
+    - enforce non-overlap when possible
     """
     if len(times) == 0:
         return []
@@ -105,13 +107,13 @@ def pick_top3_no_overlap_else_allow(times, scores, clip_len, skip_front_ratio=0.
 
     picked = []
     for score, t0 in candidates:
-        # First pass: enforce non-overlap constraint.
+        # First pass enforces non-overlap
         if all(abs(t0 - s) >= clip_len for s in picked):
             picked.append(t0)
         if len(picked) == 3:
             return sorted(picked)
 
-    # Second pass: if not enough non-overlapping candidates, allow overlap.
+    # Second pass allows overlap if needed to reach 3 candidates
     for score, t0 in candidates:
         if t0 not in picked:
             picked.append(t0)
@@ -121,7 +123,7 @@ def pick_top3_no_overlap_else_allow(times, scores, clip_len, skip_front_ratio=0.
     return sorted(picked)
 
 def cut_clip(video, t0, length, out_path, fps):
-    """Use ffmpeg to cut one clip at start `t0` with fixed duration + output fps."""
+    """Use ffmpeg to cut one clip at start `t0` with fixed duration and output fps"""
     cmd = [
         "ffmpeg", "-y",
         "-ss", f"{t0:.3f}",
@@ -149,7 +151,7 @@ def main():
     out_root = OUTPUT_DIR / f"clips_fps_{args.fps}_length_{args.clip_len}"
     out_root.mkdir(parents=True, exist_ok=True)
 
-    # Process every source video independently.
+    # Process each source video independently
     videos = sorted(INPUT_DIR.glob("*.mp4"))
     if not videos:
         raise FileNotFoundError(f"No .mp4 files found in INPUT_DIR: {INPUT_DIR}")
@@ -161,7 +163,7 @@ def main():
         vid_dir = out_root / video.stem
         vid_dir.mkdir(exist_ok=True)
 
-        # Emit up to three ranked clips per input video.
+        # Emit up to three ranked clips per input video
         for i, t0 in enumerate(starts, start=1):
             out_clip = vid_dir / f"clip_{i}.mp4"
             cut_clip(video, float(t0), args.clip_len, out_clip, args.fps)

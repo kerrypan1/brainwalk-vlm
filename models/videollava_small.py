@@ -2,13 +2,13 @@
 File Summary
 ------------
 LLaVA small-model wrapper (OneVision 0.5B) that mirrors the larger LLaVA
-adapter API while reducing compute and memory requirements.
+adapter API while reducing compute and memory requirements
 """
 from __future__ import annotations
 
 from .base_vlm import BaseVLM
 
-# Video decode + model stack.
+# Video decode and model stack
 import av
 import numpy as np
 import torch
@@ -23,12 +23,12 @@ class VideoLLaVASmall(BaseVLM):
     name = "llava_s"
 
     def __init__(self, model_id=None, num_frames=16, max_new_tokens=256):
-        # Default to the compact OneVision checkpoint.
+        # Use the compact OneVision checkpoint by default
         self.model_id = model_id or "llava-hf/llava-onevision-qwen2-0.5b-ov-hf"
         self.num_frames = int(num_frames)
         self.max_new_tokens = int(max_new_tokens)
 
-        # 4-bit quantized model keeps VRAM usage low.
+        # 4-bit quantization keeps VRAM usage low
         self.model = LlavaOnevisionForConditionalGeneration.from_pretrained(
             self.model_id,
             torch_dtype=torch.float16,
@@ -38,11 +38,11 @@ class VideoLLaVASmall(BaseVLM):
         )
         self.processor = AutoProcessor.from_pretrained(self.model_id, use_fast=True)
 
-        # Set by scripts/inference.py before running clips.
+        # Set by scripts/inference.py before running clips
         self.prompt_text = ""
 
     def _decode_first_n_frames_rgb(self, video_path: str) -> np.ndarray:
-        """Decode first N RGB frames from a pre-cut clip."""
+        """Decode first N RGB frames from a pre-cut clip"""
         frames = []
         container = av.open(video_path)
         try:
@@ -58,13 +58,13 @@ class VideoLLaVASmall(BaseVLM):
         return np.stack(frames, axis=0)
 
     def run(self, video_path, prompt=None):
-        # Allow optional direct prompt override while preserving default behavior.
+        # Allow an optional direct prompt override while keeping default behavior
         prompt_text = self.prompt_text if prompt is None else str(prompt)
         clip = self._decode_first_n_frames_rgb(str(video_path))
         if clip.size == 0:
             return "", None
 
-        # Same conversation schema as larger LLaVA wrappers.
+        # Keep the same conversation schema as the larger LLaVA wrapper
         conversation = [
             {
                 "role": "user",
@@ -75,7 +75,7 @@ class VideoLLaVASmall(BaseVLM):
             }
         ]
 
-        # Build model input text + video tensors.
+        # Build model input text and video tensors
         templated = self.processor.apply_chat_template(conversation, add_generation_prompt=True)
         inputs = self.processor(
             text=templated,
@@ -91,7 +91,7 @@ class VideoLLaVASmall(BaseVLM):
                 do_sample=False,
             )
 
-        # Decode only generated response (excluding prompt tokens).
+        # Decode only the generated response and skip prompt tokens
         prompt_len = inputs.input_ids.shape[1]
         generated = output[0][prompt_len:]
         text = self.processor.decode(generated, skip_special_tokens=True)
